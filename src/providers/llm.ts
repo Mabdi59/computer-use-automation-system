@@ -1,7 +1,11 @@
 import OpenAI from 'openai';
 
 import { redactText } from '../core/redaction.js';
-import { llmActionSchema, type LLMAction, type Observation } from '../core/schemas.js';
+import {
+  llmActionSchema,
+  type LLMAction,
+  type Observation,
+} from '../core/schemas.js';
 
 export type LLMRequest = {
   goal: string;
@@ -15,12 +19,28 @@ export interface LLMProvider {
   nextAction(request: LLMRequest): Promise<LLMAction>;
 }
 
+const extractJsonPayload = (text: string): string => {
+  const trimmed = text.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    return trimmed;
+  }
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    return trimmed.slice(start, end + 1);
+  }
+  throw new Error('LLM response did not contain a JSON action payload');
+};
+
 export class OpenAILLMProvider implements LLMProvider {
   readonly name = 'openai';
   readonly model: string;
   private readonly client: OpenAI;
 
-  constructor(apiKey: string, model = process.env.OPENAI_MODEL ?? 'gpt-5-mini') {
+  constructor(
+    apiKey: string,
+    model = process.env.OPENAI_MODEL ?? 'gpt-5-mini'
+  ) {
     this.client = new OpenAI({ apiKey });
     this.model = model;
   }
@@ -34,8 +54,7 @@ export class OpenAILLMProvider implements LLMProvider {
           content: [
             {
               type: 'input_text',
-              text:
-                'You operate a browser safely. Return one JSON action matching the provided schema. Include only a short operational rationale, never hidden reasoning.',
+              text: 'You operate a browser safely. Return one JSON action matching the provided schema. Include only a short operational rationale, never hidden reasoning.',
             },
           ],
         },
@@ -69,7 +88,7 @@ export class OpenAILLMProvider implements LLMProvider {
     });
 
     const text = response.output_text;
-    return llmActionSchema.parse(JSON.parse(text));
+    return llmActionSchema.parse(JSON.parse(extractJsonPayload(text)));
   }
 }
 
@@ -90,7 +109,10 @@ export class ScriptedLLMProvider implements LLMProvider {
   }
 }
 
-export const scriptedMemberBalancePlan = (baseUrl: string, memberId: string): LLMAction[] => [
+export const scriptedMemberBalancePlan = (
+  baseUrl: string,
+  memberId: string
+): LLMAction[] => [
   {
     type: 'navigate',
     url: `${baseUrl}/`,
@@ -105,7 +127,12 @@ export const scriptedMemberBalancePlan = (baseUrl: string, memberId: string): LL
       risk: 'safe',
       priority: [
         { kind: 'text', text: 'Member Search', frameName: 'legacy-app-frame' },
-        { kind: 'role', role: 'link', name: 'Member Search', frameName: 'legacy-app-frame' },
+        {
+          kind: 'role',
+          role: 'link',
+          name: 'Member Search',
+          frameName: 'legacy-app-frame',
+        },
       ],
     },
     rationale: 'Open the member search page.',
@@ -119,7 +146,11 @@ export const scriptedMemberBalancePlan = (baseUrl: string, memberId: string): LL
       risk: 'safe',
       priority: [
         { kind: 'label', label: 'Member ID', frameName: 'legacy-app-frame' },
-        { kind: 'css', css: 'input[name="memberId"]', frameName: 'legacy-app-frame' },
+        {
+          kind: 'css',
+          css: 'input[name="memberId"]',
+          frameName: 'legacy-app-frame',
+        },
       ],
     },
     value: memberId,
@@ -134,7 +165,12 @@ export const scriptedMemberBalancePlan = (baseUrl: string, memberId: string): LL
       stableReason: 'The button text is a stable verb in the product flow.',
       risk: 'safe',
       priority: [
-        { kind: 'role', role: 'button', name: 'Search Member', frameName: 'legacy-app-frame' },
+        {
+          kind: 'role',
+          role: 'button',
+          name: 'Search Member',
+          frameName: 'legacy-app-frame',
+        },
         { kind: 'text', text: 'Search Member', frameName: 'legacy-app-frame' },
       ],
     },
@@ -145,10 +181,15 @@ export const scriptedMemberBalancePlan = (baseUrl: string, memberId: string): LL
     target: {
       name: 'Savings balance label',
       description: 'Savings balance table row label',
-      stableReason: 'This product label is stable and readable in the member details page.',
+      stableReason:
+        'This product label is stable and readable in the member details page.',
       risk: 'safe',
       priority: [
-        { kind: 'text', text: 'Savings Balance', frameName: 'legacy-app-frame' },
+        {
+          kind: 'text',
+          text: 'Savings Balance',
+          frameName: 'legacy-app-frame',
+        },
         { kind: 'css', css: 'td.balance-label', frameName: 'legacy-app-frame' },
       ],
     },
@@ -161,7 +202,8 @@ export const scriptedMemberBalancePlan = (baseUrl: string, memberId: string): LL
     target: {
       name: 'Savings balance value',
       description: 'Savings balance value cell',
-      stableReason: 'The row is anchored by a stable visible label with a scoped CSS fallback.',
+      stableReason:
+        'The row is anchored by a stable visible label with a scoped CSS fallback.',
       risk: 'safe',
       priority: [
         { kind: 'css', css: '#savings-balance', frameName: 'legacy-app-frame' },

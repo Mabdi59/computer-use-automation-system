@@ -7,14 +7,20 @@ export class EvidenceWriter {
   readonly runDir: string;
   readonly files = new Set<string>();
 
-  constructor(private readonly baseDir: string, correlationId = randomUUID()) {
+  constructor(
+    private readonly baseDir: string,
+    correlationId = randomUUID()
+  ) {
     this.correlationId = correlationId;
     this.runDir = join(baseDir, correlationId);
   }
 
   async init(runSummary: Record<string, unknown>): Promise<void> {
     await mkdir(this.runDir, { recursive: true });
-    await this.writeJson('run.json', { correlationId: this.correlationId, ...runSummary });
+    await this.writeJson('run.json', {
+      correlationId: this.correlationId,
+      ...runSummary,
+    });
   }
 
   async writeJson(fileName: string, value: unknown): Promise<string> {
@@ -40,7 +46,9 @@ export class EvidenceWriter {
     const entries = Array.from(this.files.values()).sort();
     for (const filePath of entries) {
       const content = await readFile(filePath);
-      hashes[relative(this.runDir, filePath)] = createHash('sha256').update(content).digest('hex');
+      hashes[relative(this.runDir, filePath)] = createHash('sha256')
+        .update(content)
+        .digest('hex');
     }
     return this.writeJson('manifest.json', {
       correlationId: this.correlationId,

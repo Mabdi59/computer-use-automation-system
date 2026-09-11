@@ -8,6 +8,7 @@ const stableStringify = (value: unknown): string => {
   }
   if (value && typeof value === 'object') {
     return `{${Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => entry !== undefined)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`)
       .join(',')}}`;
@@ -15,13 +16,18 @@ const stableStringify = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-export const artifactPayloadForChecksum = (artifact: CapabilityArtifact): Omit<CapabilityArtifact, 'integrity'> => {
+export const artifactPayloadForChecksum = (
+  artifact: CapabilityArtifact
+): Omit<CapabilityArtifact, 'integrity'> => {
   const { integrity: _integrity, ...payload } = artifact;
   return payload;
 };
 
-export const computeArtifactChecksum = (artifact: CapabilityArtifact | Omit<CapabilityArtifact, 'integrity'>): string =>
+export const computeArtifactChecksum = (
+  artifact: CapabilityArtifact | Omit<CapabilityArtifact, 'integrity'>
+): string =>
   createHash('sha256').update(stableStringify(artifact)).digest('hex');
 
 export const verifyArtifactChecksum = (artifact: CapabilityArtifact): boolean =>
-  computeArtifactChecksum(artifactPayloadForChecksum(artifact)) === artifact.integrity.checksum;
+  computeArtifactChecksum(artifactPayloadForChecksum(artifact)) ===
+  artifact.integrity.checksum;

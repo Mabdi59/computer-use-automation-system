@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
-import { computeArtifactChecksum } from './core/checksum.js';
+import {
+  artifactPayloadForChecksum,
+  computeArtifactChecksum,
+} from './core/checksum.js';
 import { EvidenceWriter } from './core/evidence.js';
 import { sanitizeObject } from './core/redaction.js';
 import {
@@ -16,7 +19,7 @@ import {
 import { parameterizeValue } from './core/template.js';
 import { evaluatePolicy } from './core/policy.js';
 import type { LLMProvider } from './providers/llm.js';
-import type { HandoffManager } from './runtime/handoff.js';
+import type { InterventionRequest, HandoffManager } from './runtime/handoff.js';
 import { PlaywrightSurfaceAdapter } from './surface/playwright.js';
 
 const slugify = (value: string): string =>
@@ -25,7 +28,10 @@ const slugify = (value: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
 
-const inferInputs = (goal: string, explicitInputs: Record<string, string>): Record<string, string> => {
+const inferInputs = (
+  goal: string,
+  explicitInputs: Record<string, string>
+): Record<string, string> => {
   if (Object.keys(explicitInputs).length > 0) {
     return explicitInputs;
   }
@@ -40,6 +46,31 @@ const withTargetId = (target: DirectTarget): DirectTarget & { id: string } => ({
 
 const getActionTarget = (action: LLMAction): DirectTarget | undefined =>
   'target' in action ? action.target : undefined;
+
+const ensureWithinRunBudget = (
+  startedAt: number,
+  maxRunDurationMs: number,
+  phase: string
+): void => {
+  if (Date.now() - startedAt > maxRunDurationMs) {
+    throw new Error(`Run exceeded max duration during ${phase}`);
+  }
+};
+
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      )
+    ),
+  ]);
 
 const buildArtifactFromRun = (params: {
   goal: string;
@@ -57,8 +88,10 @@ const buildArtifactFromRun = (params: {
       if ('target' in actionCopy && actionCopy.target) {
         const target = withTargetId(actionCopy.target);
         targets.set(target.id, target);
-        (actionCopy as Extract<LLMAction, { target?: DirectTarget }>).targetId = target.id;
-        delete (actionCopy as Extract<LLMAction, { target?: DirectTarget }>).target;
+        (actionCopy as Extract<LLMAction, { target?: DirectTarget }>).targetId =
+          target.id;
+        delete (actionCopy as Extract<LLMAction, { target?: DirectTarget }>)
+          .target;
       }
       if ('value' in actionCopy) {
         actionCopy.value = parameterizeValue(actionCopy.value, params.inputs);
@@ -67,13 +100,20 @@ const buildArtifactFromRun = (params: {
         actionCopy.url = parameterizeValue(actionCopy.url, params.inputs);
       }
       if ('expected' in actionCopy) {
-        actionCopy.expected = parameterizeValue(actionCopy.expected, params.inputs);
+        actionCopy.expected = parameterizeValue(
+          actionCopy.expected,
+          params.inputs
+        );
       }
       return {
         id: `step-${index + 1}`,
         description: `${action.type} step ${index + 1}`,
         action: { ...actionCopy, rationale: action.rationale },
-        risk: action.type === 'click' && /confirm|submit/i.test(getActionTarget(action)?.name ?? '') ? 'irreversible' : 'safe',
+        risk:
+          action.type === 'click' &&
+          /confirm|submit/i.test(getActionTarget(action)?.name ?? '')
+            ? 'irreversible'
+            : 'safe',
         timeoutMs: 5_000,
         retryPolicy: { maxAttempts: action.type === 'assert' ? 2 : 1 },
         expectedPageState:
@@ -82,17 +122,25 @@ const buildArtifactFromRun = (params: {
             : action.type === 'assert' && action.condition === 'containsText'
               ? { textIncludes: action.expected }
               : {},
-        checkpoint: action.type === 'assert' ? `checkpoint-${index + 1}` : undefined,
+        checkpoint:
+          action.type === 'assert' ? `checkpoint-${index + 1}` : undefined,
       };
     });
 
+  const checkpoints = steps
+    .map((step) => step.checkpoint)
+    .filter((value): value is string => Boolean(value));
   const artifactWithoutIntegrity: Omit<CapabilityArtifact, 'integrity'> = {
     schemaVersion: '1.0.0' as const,
     capabilityId: slugify(params.goal).slice(0, 60),
     name: params.goal,
     description: `Discovered capability for ${params.goal}`,
     revision: 1,
-    vendor: { name: 'Synthetic Credit Union', application: 'Legacy Servicing Portal', variant: 'mock-local' },
+    vendor: {
+      name: 'Synthetic Credit Union',
+      application: 'Legacy Servicing Portal',
+      variant: 'mock-local',
+    },
     compatibleVersions: ['legacy-v1'],
     approvalState: 'draft' as const,
     riskClassification: 'safe' as const,
@@ -114,8 +162,11 @@ const buildArtifactFromRun = (params: {
     preconditions: ['Synthetic target app is running locally on 127.0.0.1.'],
     steps,
     targets: Array.from(targets.values()),
-    checkpoints: steps.map((step) => step.checkpoint).filter((value): value is string => Boolean(value)),
-    successCondition: { type: 'output_present' as const, outputKey: Object.keys(params.outputs)[0] ?? 'result' },
+    checkpoints: checkpoints.length > 0 ? checkpoints : ['final-output'],
+    successCondition: {
+      type: 'output_present' as const,
+      outputKey: Object.keys(params.outputs)[0] ?? 'result',
+    },
     businessOutcomeDetectors: [
       {
         code: 'MEMBER_NOT_FOUND',
@@ -124,24 +175,44 @@ const buildArtifactFromRun = (params: {
       },
     ],
     recoverableConditionHandlers: [
-      { category: 'Transient timeout' as const, strategy: 'retry' as const, maxAttempts: 2 },
+      {
+        category: 'Transient timeout' as const,
+        strategy: 'retry' as const,
+        maxAttempts: 2,
+      },
     ],
-    redaction: { sensitiveFields: ['password', 'payment', 'ssn'], secretPatterns: ['token', 'cookie'] },
+    redaction: {
+      sensitiveFields: ['password', 'payment', 'ssn'],
+      secretPatterns: ['token', 'cookie'],
+    },
     defaults: { baseUrl: params.targetUrl, targetRoute: '/' },
     overrides: [
-      { tenant: 'synthetic-default', compatibleVersions: ['legacy-v1'], targetRoute: '/' },
+      {
+        tenant: 'synthetic-default',
+        compatibleVersions: ['legacy-v1'],
+        targetRoute: '/',
+      },
     ],
     createdAt: new Date().toISOString(),
     createdBy: {
-      mode: params.provider.name === 'openai' ? ('openai-live' as const) : ('scripted-test' as const),
+      mode:
+        params.provider.name === 'openai'
+          ? ('openai-live' as const)
+          : ('scripted-test' as const),
       provider: params.provider.name,
       model: params.provider.model,
     },
   };
 
-  const checksum = computeArtifactChecksum(artifactWithoutIntegrity);
-  return capabilityArtifactSchema.parse({
+  const provisionalArtifact = capabilityArtifactSchema.parse({
     ...artifactWithoutIntegrity,
+    integrity: { algorithm: 'sha256' as const, checksum: 'pending' },
+  });
+  const checksum = computeArtifactChecksum(
+    artifactPayloadForChecksum(provisionalArtifact)
+  );
+  return capabilityArtifactSchema.parse({
+    ...provisionalArtifact,
     integrity: { algorithm: 'sha256' as const, checksum },
   });
 };
@@ -156,42 +227,96 @@ export const runDiscovery = async (params: {
   headed?: boolean;
   inputHints?: Record<string, string>;
   handoffManager?: HandoffManager;
+  onInterventionRequested?: (context: {
+    intervention: InterventionRequest;
+  }) => Promise<void>;
 }): Promise<ReturnType<typeof discoveryRunResultSchema.parse>> => {
   const evidence = new EvidenceWriter(params.evidenceBaseDir);
-  await evidence.init({ goal: params.goal, mode: params.provider.name === 'openai' ? 'openai-live' : 'scripted-test' });
+  await evidence.init({
+    goal: params.goal,
+    mode: params.provider.name === 'openai' ? 'openai-live' : 'scripted-test',
+  });
 
-  const adapter = await PlaywrightSurfaceAdapter.launch({ targetUrl: params.targetUrl, headed: params.headed });
+  const adapter = await PlaywrightSurfaceAdapter.launch({
+    targetUrl: params.targetUrl,
+    headed: params.headed,
+  });
   const outputs: Record<string, string> = {};
   const actions: LLMAction[] = [];
   const inputs = inferInputs(params.goal, params.inputHints ?? {});
   const seenActions = new Map<string, number>();
+  const startedAt = Date.now();
 
   try {
     for (let step = 1; step <= params.policy.maxSteps; step += 1) {
-      const observation = await adapter.observe(join(evidence.runDir, 'screenshots'), `step-${step}`);
-      await evidence.appendEvent({ step, phase: 'observe', observation: sanitizeObject(observation) });
+      ensureWithinRunBudget(
+        startedAt,
+        params.policy.maxRunDurationMs,
+        `step ${step} observation`
+      );
+      const observation = await withTimeout(
+        adapter.observe(join(evidence.runDir, 'screenshots'), `step-${step}`),
+        params.policy.perStepTimeoutMs,
+        `discovery observation ${step}`
+      );
+      await evidence.appendEvent({
+        step,
+        phase: 'observe',
+        observation: sanitizeObject(observation),
+      });
 
       if (observation.visibleText.includes('No synthetic member matched')) {
-        const result = { status: 'business_outcome', code: 'MEMBER_NOT_FOUND', message: 'Member was not found in synthetic application.' };
+        const result = {
+          status: 'business_outcome',
+          code: 'MEMBER_NOT_FOUND',
+          message: 'Member was not found in synthetic application.',
+        };
         await evidence.writeJson('result.json', result);
         await evidence.writeManifest('scripted-test', params.provider.name);
         return discoveryRunResultSchema.parse(result);
       }
 
+      ensureWithinRunBudget(
+        startedAt,
+        params.policy.maxRunDurationMs,
+        `step ${step} llm action`
+      );
       const action = llmActionSchema.parse(
-        await params.provider.nextAction({ goal: params.goal, observation: sanitizeObject(observation), previousActions: actions })
+        await withTimeout(
+          params.provider.nextAction({
+            goal: params.goal,
+            observation: sanitizeObject(observation),
+            previousActions: actions,
+          }),
+          params.policy.perStepTimeoutMs,
+          `llm action ${step}`
+        )
       );
       const actionKey = JSON.stringify(action);
       seenActions.set(actionKey, (seenActions.get(actionKey) ?? 0) + 1);
       if ((seenActions.get(actionKey) ?? 0) > 3) {
-        const result = { status: 'failure', category: 'Internal error', message: 'Discovery stopped after repeated actions.' };
+        const result = {
+          status: 'failure',
+          category: 'Internal error',
+          message: 'Discovery stopped after repeated actions.',
+        };
         await evidence.writeJson('result.json', result);
         await evidence.writeManifest('scripted-test', params.provider.name);
         return discoveryRunResultSchema.parse(result);
       }
 
-      const policyDecision = evaluatePolicy(params.policy, action, observation.url, getActionTarget(action)?.name);
-      await evidence.appendEvent({ step, phase: 'policy', action, policyDecision });
+      const policyDecision = evaluatePolicy(
+        params.policy,
+        action,
+        observation.url,
+        getActionTarget(action)?.name
+      );
+      await evidence.appendEvent({
+        step,
+        phase: 'policy',
+        action,
+        policyDecision,
+      });
       if (!policyDecision.allowed) {
         if (policyDecision.risk === 'irreversible' && params.handoffManager) {
           const intervention = await params.handoffManager.requestIntervention({
@@ -203,11 +328,41 @@ export const runDiscovery = async (params: {
             observation,
             evidenceLinks: [evidence.runDir],
           });
-          await adapter.enableHumanAudit((event) => params.handoffManager?.recordAudit(intervention.interventionId, event));
-          await evidence.appendEvent({ step, phase: 'handoff', interventionId: intervention.interventionId });
-          const decision = await params.handoffManager.waitForResolution(intervention.interventionId);
+          await adapter.enableHumanAudit((event) =>
+            params.handoffManager?.recordAudit(
+              intervention.interventionId,
+              event
+            )
+          );
+          await evidence.appendEvent({
+            step,
+            phase: 'handoff',
+            interventionId: intervention.interventionId,
+          });
+          if (!params.onInterventionRequested && !params.headed) {
+            params.handoffManager.markAwaitingExternalResolution(
+              intervention.interventionId
+            );
+            const result = {
+              status: 'intervention_required',
+              interventionId: intervention.interventionId,
+              message: policyDecision.reason,
+            };
+            await evidence.writeJson('result.json', result);
+            await evidence.writeManifest('scripted-test', params.provider.name);
+            return discoveryRunResultSchema.parse(result);
+          }
+          params.handoffManager.claim(intervention.interventionId);
+          await params.onInterventionRequested?.({ intervention });
+          const decision = await params.handoffManager.waitForResolution(
+            intervention.interventionId
+          );
           if (decision === 'abort') {
-            const result = { status: 'intervention_required', interventionId: intervention.interventionId, message: 'Operator aborted the discovery run.' };
+            const result = {
+              status: 'intervention_required',
+              interventionId: intervention.interventionId,
+              message: 'Operator aborted the discovery run.',
+            };
             await evidence.writeJson('result.json', result);
             await evidence.writeManifest('scripted-test', params.provider.name);
             return discoveryRunResultSchema.parse(result);
@@ -216,7 +371,11 @@ export const runDiscovery = async (params: {
           continue;
         }
 
-        const result = { status: 'failure', category: 'Policy violation', message: policyDecision.reason };
+        const result = {
+          status: 'failure',
+          category: 'Policy violation',
+          message: policyDecision.reason,
+        };
         await evidence.writeJson('result.json', result);
         await evidence.writeManifest('scripted-test', params.provider.name);
         return discoveryRunResultSchema.parse(result);
@@ -224,7 +383,11 @@ export const runDiscovery = async (params: {
 
       if (action.type === 'finish') {
         if (action.status === 'business_outcome') {
-          const result = { status: 'business_outcome', code: action.outcomeCode ?? 'BUSINESS_OUTCOME', message: action.reason };
+          const result = {
+            status: 'business_outcome',
+            code: action.outcomeCode ?? 'BUSINESS_OUTCOME',
+            message: action.reason,
+          };
           await evidence.writeJson('result.json', result);
           await evidence.writeManifest('scripted-test', params.provider.name);
           return discoveryRunResultSchema.parse(result);
@@ -240,16 +403,30 @@ export const runDiscovery = async (params: {
         await mkdir(dirname(params.artifactPath), { recursive: true });
         await writeFile(params.artifactPath, JSON.stringify(artifact, null, 2));
         evidence.registerFile(params.artifactPath);
-        await evidence.writeJson(`generated-${basename(params.artifactPath)}`, artifact);
-        const result = { status: 'success', artifactPath: params.artifactPath, outputs };
+        await evidence.writeJson(
+          `generated-${basename(params.artifactPath)}`,
+          artifact
+        );
+        const result = {
+          status: 'success',
+          artifactPath: params.artifactPath,
+          outputs,
+        };
         await evidence.writeJson('result.json', result);
-        await evidence.writeManifest(artifact.createdBy.mode, params.provider.name);
+        await evidence.writeManifest(
+          artifact.createdBy.mode,
+          params.provider.name
+        );
         return discoveryRunResultSchema.parse(result);
       }
 
       if (action.type === 'escalate') {
         if (!params.handoffManager) {
-          const result = { status: 'intervention_required', interventionId: 'unavailable', message: action.reason };
+          const result = {
+            status: 'intervention_required',
+            interventionId: 'unavailable',
+            message: action.reason,
+          };
           await evidence.writeJson('result.json', result);
           await evidence.writeManifest('scripted-test', params.provider.name);
           return discoveryRunResultSchema.parse(result);
@@ -263,10 +440,33 @@ export const runDiscovery = async (params: {
           observation,
           evidenceLinks: [evidence.runDir],
         });
-        await adapter.enableHumanAudit((event) => params.handoffManager?.recordAudit(intervention.interventionId, event));
-        const decision = await params.handoffManager.waitForResolution(intervention.interventionId);
+        await adapter.enableHumanAudit((event) =>
+          params.handoffManager?.recordAudit(intervention.interventionId, event)
+        );
+        if (!params.onInterventionRequested && !params.headed) {
+          params.handoffManager.markAwaitingExternalResolution(
+            intervention.interventionId
+          );
+          const result = {
+            status: 'intervention_required',
+            interventionId: intervention.interventionId,
+            message: action.reason,
+          };
+          await evidence.writeJson('result.json', result);
+          await evidence.writeManifest('scripted-test', params.provider.name);
+          return discoveryRunResultSchema.parse(result);
+        }
+        params.handoffManager.claim(intervention.interventionId);
+        await params.onInterventionRequested?.({ intervention });
+        const decision = await params.handoffManager.waitForResolution(
+          intervention.interventionId
+        );
         if (decision === 'abort') {
-          const result = { status: 'intervention_required', interventionId: intervention.interventionId, message: 'Operator aborted the discovery run.' };
+          const result = {
+            status: 'intervention_required',
+            interventionId: intervention.interventionId,
+            message: 'Operator aborted the discovery run.',
+          };
           await evidence.writeJson('result.json', result);
           await evidence.writeManifest('scripted-test', params.provider.name);
           return discoveryRunResultSchema.parse(result);
@@ -275,15 +475,42 @@ export const runDiscovery = async (params: {
         continue;
       }
 
-      const execution = await adapter.perform(action, getActionTarget(action));
+      ensureWithinRunBudget(
+        startedAt,
+        params.policy.maxRunDurationMs,
+        `step ${step} execution`
+      );
+      const execution = await withTimeout(
+        adapter.perform(action, getActionTarget(action)),
+        params.policy.perStepTimeoutMs,
+        `discovery action ${step}`
+      );
       if (action.type === 'extract' && execution.extracted) {
         outputs[action.outputKey] = execution.extracted;
       }
       actions.push(action);
-      await evidence.appendEvent({ step, phase: 'action', action, executionResult: sanitizeObject(execution) });
+      await evidence.appendEvent({
+        step,
+        phase: 'action',
+        action,
+        executionResult: sanitizeObject(execution),
+      });
     }
 
-    const result = { status: 'failure', category: 'Internal error', message: 'Discovery hit the maximum step limit.' };
+    const result = {
+      status: 'failure',
+      category: 'Internal error',
+      message: 'Discovery hit the maximum step limit.',
+    };
+    await evidence.writeJson('result.json', result);
+    await evidence.writeManifest('scripted-test', params.provider.name);
+    return discoveryRunResultSchema.parse(result);
+  } catch (error) {
+    const result = {
+      status: 'failure',
+      category: 'Internal error',
+      message: (error as Error).message,
+    };
     await evidence.writeJson('result.json', result);
     await evidence.writeManifest('scripted-test', params.provider.name);
     return discoveryRunResultSchema.parse(result);

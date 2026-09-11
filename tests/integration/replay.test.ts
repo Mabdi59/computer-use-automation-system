@@ -4,9 +4,15 @@ import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { artifactPayloadForChecksum, computeArtifactChecksum } from '../../src/core/checksum.js';
+import {
+  artifactPayloadForChecksum,
+  computeArtifactChecksum,
+} from '../../src/core/checksum.js';
 import { createDefaultPolicy } from '../../src/core/defaults.js';
-import { buildExampleMemberBalanceArtifact, buildOpenSubAccountArtifact } from '../../src/examples.js';
+import {
+  buildExampleMemberBalanceArtifact,
+  buildOpenSubAccountArtifact,
+} from '../../src/examples.js';
 import { runReplay } from '../../src/replay.js';
 import { HandoffManager } from '../../src/runtime/handoff.js';
 import { createTargetServer } from '../../src/target/server.js';
@@ -23,8 +29,18 @@ describe('deterministic replay integration', () => {
     tempDir = await mkdtemp(join(os.tmpdir(), 'computer-use-tests-'));
     memberArtifactPath = join(tempDir, 'member-balance.v1.json');
     openArtifactPath = join(tempDir, 'open-sub-account-review.v1.json');
-    await writeFile(memberArtifactPath, JSON.stringify(buildExampleMemberBalanceArtifact(defaultTargetUrl), null, 2));
-    await writeFile(openArtifactPath, JSON.stringify(buildOpenSubAccountArtifact(defaultTargetUrl), null, 2));
+    await writeFile(
+      memberArtifactPath,
+      JSON.stringify(
+        buildExampleMemberBalanceArtifact(defaultTargetUrl),
+        null,
+        2
+      )
+    );
+    await writeFile(
+      openArtifactPath,
+      JSON.stringify(buildOpenSubAccountArtifact(defaultTargetUrl), null, 2)
+    );
     await targetServer.start();
   });
 
@@ -43,7 +59,9 @@ describe('deterministic replay integration', () => {
     });
 
     expect(result.status).toBe('success');
-    expect(result.status === 'success' ? result.outputs.savingsBalance : '').toBe('$1,234.56');
+    expect(
+      result.status === 'success' ? result.outputs.savingsBalance : ''
+    ).toBe('$1,234.56');
     expect(sentinelProvider.nextAction).not.toHaveBeenCalled();
   });
 
@@ -56,7 +74,10 @@ describe('deterministic replay integration', () => {
       evidenceBaseDir: join(tempDir, 'replay-business-outcome'),
     });
 
-    expect(result).toMatchObject({ status: 'business_outcome', code: 'MEMBER_NOT_FOUND' });
+    expect(result).toMatchObject({
+      status: 'business_outcome',
+      code: 'MEMBER_NOT_FOUND',
+    });
   });
 
   for (const [scenario, category] of [
@@ -97,7 +118,9 @@ describe('deterministic replay integration', () => {
     const driftedArtifactPath = join(tempDir, 'drifted-artifact.json');
     const drifted = buildExampleMemberBalanceArtifact(defaultTargetUrl);
     drifted.steps[3]!.expectedPageState.textIncludes = 'Definitely Not Present';
-    drifted.integrity.checksum = computeArtifactChecksum(artifactPayloadForChecksum(drifted));
+    drifted.integrity.checksum = computeArtifactChecksum(
+      artifactPayloadForChecksum(drifted)
+    );
     await writeFile(driftedArtifactPath, JSON.stringify(drifted, null, 2));
 
     const result = await runReplay({
@@ -107,7 +130,10 @@ describe('deterministic replay integration', () => {
       policy: createDefaultPolicy(),
       evidenceBaseDir: join(tempDir, 'drifted'),
     });
-    expect(result).toMatchObject({ status: 'failure', category: 'Checkpoint failure' });
+    expect(result).toMatchObject({
+      status: 'failure',
+      category: 'Checkpoint failure',
+    });
   });
 
   it('blocks irreversible replay steps when no human approval path is provided', async () => {
@@ -119,34 +145,45 @@ describe('deterministic replay integration', () => {
       evidenceBaseDir: join(tempDir, 'irreversible-blocked'),
     });
 
-    expect(result).toMatchObject({ status: 'failure', category: 'Policy violation' });
+    expect(result).toMatchObject({
+      status: 'failure',
+      category: 'Policy violation',
+    });
   });
 
-  it(
-    'pauses, keeps the same browser context, records audit events, and resumes',
-    async () => {
-      const manager = new HandoffManager();
-      let sameContext = false;
-      const result = await runReplay({
-        artifactPath: openArtifactPath,
-        inputs: { memberId: '12345' },
-        targetUrl: defaultTargetUrl,
-        policy: createDefaultPolicy(),
-        evidenceBaseDir: join(tempDir, 'handoff'),
-        handoffManager: manager,
-        onInterventionRequested: async ({ interventionId, context, page }) => {
-          sameContext = context === page.context();
-          const frame = page.frame({ name: 'legacy-app-frame' });
-          await frame?.getByRole('button', { name: 'Confirm Submission' }).click();
-          manager.recordAudit(interventionId, { type: 'click', at: frame?.url() ?? page.url(), source: 'simulated-operator' });
-          manager.resolve(interventionId, 'resume');
-        },
-      });
+  it('pauses, keeps the same browser context, records audit events, and resumes', async () => {
+    const manager = new HandoffManager();
+    let sameContext = false;
+    const result = await runReplay({
+      artifactPath: openArtifactPath,
+      inputs: { memberId: '12345' },
+      targetUrl: defaultTargetUrl,
+      policy: createDefaultPolicy(),
+      evidenceBaseDir: join(tempDir, 'handoff'),
+      handoffManager: manager,
+      onInterventionRequested: async ({ interventionId, context, page }) => {
+        sameContext = context === page.context();
+        const frame = page.frame({ name: 'legacy-app-frame' });
+        await frame
+          ?.getByRole('button', { name: 'Confirm Submission' })
+          .click();
+        manager.recordAudit(interventionId, {
+          type: 'click',
+          at: frame?.url() ?? page.url(),
+          source: 'simulated-operator',
+        });
+        manager.resolve(
+          interventionId,
+          'resume',
+          manager.get(interventionId).leaseToken
+        );
+      },
+    });
 
-      expect(sameContext).toBe(true);
-      expect(result.status).toBe('success');
-      expect(manager.list()[0]?.auditEvents.some((event) => event.type === 'click')).toBe(true);
-    },
-    10_000
-  );
+    expect(sameContext).toBe(true);
+    expect(result.status).toBe('success');
+    expect(
+      manager.list()[0]?.auditEvents.some((event) => event.type === 'click')
+    ).toBe(true);
+  }, 10_000);
 });

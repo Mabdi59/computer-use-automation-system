@@ -7,25 +7,61 @@ const syntheticMember = {
   name: 'SYNTHETIC MEMBER ALPHA',
   savingsBalance: '$1,234.56',
 };
+const syntheticProduct = 'Synthetic Holiday Club';
+
+const allowedScenarios = new Set([
+  'member-found',
+  'member-not-found',
+  'validation-error',
+  'permission-denied',
+  'unexpected-dialog',
+  'session-expired',
+  'slow-load',
+  'application-error',
+]);
+
+const normalizeScenario = (value: unknown): string => {
+  const scenario = String(value ?? 'member-found');
+  return allowedScenarios.has(scenario) ? scenario : 'member-found';
+};
+
+const escapeHtml = (value: string): string =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+
+const outcomeMessages: Record<string, string> = {
+  REQUIRED_MEMBER_ID: 'Validation error: member id is required.',
+  SYNTHETIC_VALIDATION_ERROR:
+    'Validation error: synthetic flow rejected the request.',
+  MEMBER_NOT_FOUND: 'No synthetic member matched the supplied id.',
+};
 
 const renderShell = (content: string, scenario: string) => `<!doctype html>
 <html>
   <head><title>Synthetic Credit Union Shell</title></head>
   <body>
     <table border="1" width="100%"><tr><td><strong>Synthetic Legacy Credit Union Portal</strong></td></tr></table>
-    <p>All data is synthetic. Scenario: ${scenario}</p>
+    <p>All data is synthetic. Scenario: ${escapeHtml(scenario)}</p>
     <iframe title="legacy-app-frame" name="legacy-app-frame" src="/app/home?scenario=${encodeURIComponent(scenario)}" width="100%" height="720"></iframe>
     ${content}
   </body>
 </html>`;
 
-const tableLayout = (title: string, body: string) => `<!doctype html><html><head><title>${title}</title></head><body>
+const tableLayout = (
+  title: string,
+  body: string
+) => `<!doctype html><html><head><title>${title}</title></head><body>
 <table border="1" cellpadding="6" cellspacing="0" width="100%">
 <tr><td colspan="2"><h1>${title}</h1></td></tr>
 ${body}
 </table></body></html>`;
 
-const delay = async (milliseconds: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const delay = async (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export const createTargetServer = (port = 3000) => {
   const app = express();
@@ -36,12 +72,12 @@ export const createTargetServer = (port = 3000) => {
   });
 
   app.get('/', (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
+    const scenario = normalizeScenario(request.query.scenario);
     response.send(renderShell('', scenario));
   });
 
   app.get('/app/home', (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
+    const scenario = normalizeScenario(request.query.scenario);
     response.send(
       tableLayout(
         'Legacy Servicing Home',
@@ -51,8 +87,11 @@ export const createTargetServer = (port = 3000) => {
   });
 
   app.get('/app/member-search', async (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
-    const message = String(request.query.message ?? '');
+    const scenario = normalizeScenario(request.query.scenario);
+    const outcome = String(request.query.outcome ?? '');
+    const message = outcomeMessages[outcome]
+      ? escapeHtml(outcomeMessages[outcome])
+      : '';
     if (scenario === 'slow-load') {
       await delay(250);
     }
@@ -70,7 +109,7 @@ export const createTargetServer = (port = 3000) => {
   });
 
   app.post('/app/member-search', async (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
+    const scenario = normalizeScenario(request.query.scenario);
     const memberId = String(request.body.memberId ?? '').trim();
     if (scenario === 'slow-load') {
       await delay(250);
@@ -88,22 +127,30 @@ export const createTargetServer = (port = 3000) => {
       return;
     }
     if (!memberId) {
-      response.redirect(`/app/member-search?scenario=${encodeURIComponent(scenario)}&message=${encodeURIComponent('Validation error: member id is required.')}`);
+      response.redirect(
+        `/app/member-search?scenario=${encodeURIComponent(scenario)}&outcome=REQUIRED_MEMBER_ID`
+      );
       return;
     }
     if (scenario === 'validation-error') {
-      response.redirect(`/app/member-search?scenario=${encodeURIComponent(scenario)}&message=${encodeURIComponent('Validation error: synthetic flow rejected the request.')}`);
+      response.redirect(
+        `/app/member-search?scenario=${encodeURIComponent(scenario)}&outcome=SYNTHETIC_VALIDATION_ERROR`
+      );
       return;
     }
     if (scenario === 'member-not-found' || memberId !== syntheticMember.id) {
-      response.redirect(`/app/member-search?scenario=${encodeURIComponent(scenario)}&message=${encodeURIComponent('No synthetic member matched the supplied id.')}`);
+      response.redirect(
+        `/app/member-search?scenario=${encodeURIComponent(scenario)}&outcome=MEMBER_NOT_FOUND`
+      );
       return;
     }
-    response.redirect(`/app/member/${syntheticMember.id}?scenario=${encodeURIComponent(scenario)}`);
+    response.redirect(
+      `/app/member/${syntheticMember.id}?scenario=${encodeURIComponent(scenario)}`
+    );
   });
 
   app.get('/app/member/:memberId', async (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
+    const scenario = normalizeScenario(request.query.scenario);
     if (scenario === 'slow-load' && request.query.loaded !== '1') {
       response.send(
         tableLayout(
@@ -128,7 +175,7 @@ export const createTargetServer = (port = 3000) => {
   });
 
   app.get('/app/open-sub-account/start', (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
+    const scenario = normalizeScenario(request.query.scenario);
     response.send(
       tableLayout(
         'Open Sub-Account - Step 1',
@@ -142,33 +189,55 @@ export const createTargetServer = (port = 3000) => {
   });
 
   app.post('/app/open-sub-account/start', (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
-    const product = String(request.body.product ?? 'Synthetic Holiday Club');
-    response.redirect(`/app/open-sub-account/review?scenario=${encodeURIComponent(scenario)}&product=${encodeURIComponent(product)}`);
+    const scenario = normalizeScenario(request.query.scenario);
+    void request.body.product;
+    response.redirect(
+      `/app/open-sub-account/review?scenario=${encodeURIComponent(scenario)}`
+    );
   });
 
   app.get('/app/open-sub-account/review', (request, response) => {
-    const scenario = String(request.query.scenario ?? 'member-found');
-    const product = String(request.query.product ?? 'Synthetic Holiday Club');
+    const scenario = normalizeScenario(request.query.scenario);
     response.send(
       tableLayout(
         'Open Sub-Account - Review',
         `<tr><td>Review</td><td>Synthetic only. No real transaction will be executed.</td></tr>
-         <tr><td>Requested Product</td><td>${product}</td></tr>
+         <tr><td>Requested Product</td><td>${escapeHtml(syntheticProduct)}</td></tr>
          <tr><td>Actions</td><td><button>Confirm Submission</button></td></tr>
-         <tr><td>Scenario</td><td>${scenario}</td></tr>`
+         <tr><td>Scenario</td><td>${escapeHtml(scenario)}</td></tr>`
       )
     );
   });
 
   app.get('/app/permission-denied', (_request, response) => {
-    response.status(403).send(tableLayout('Permission Denied', '<tr><td colspan="2">Permission denied for synthetic operator.</td></tr>'));
+    response
+      .status(403)
+      .send(
+        tableLayout(
+          'Permission Denied',
+          '<tr><td colspan="2">Permission denied for synthetic operator.</td></tr>'
+        )
+      );
   });
   app.get('/app/session-expired', (_request, response) => {
-    response.status(440).send(tableLayout('Session Expired', '<tr><td colspan="2">Session expired. Reauthenticate in synthetic environment.</td></tr>'));
+    response
+      .status(440)
+      .send(
+        tableLayout(
+          'Session Expired',
+          '<tr><td colspan="2">Session expired. Reauthenticate in synthetic environment.</td></tr>'
+        )
+      );
   });
   app.get('/app/application-error', (_request, response) => {
-    response.status(500).send(tableLayout('Application Error', '<tr><td colspan="2">Synthetic application error triggered by scenario.</td></tr>'));
+    response
+      .status(500)
+      .send(
+        tableLayout(
+          'Application Error',
+          '<tr><td colspan="2">Synthetic application error triggered by scenario.</td></tr>'
+        )
+      );
   });
 
   let server: http.Server | undefined;
@@ -184,7 +253,9 @@ export const createTargetServer = (port = 3000) => {
       if (!server) {
         return;
       }
-      await new Promise<void>((resolve, reject) => server?.close((error) => (error ? reject(error) : resolve())));
+      await new Promise<void>((resolve, reject) =>
+        server?.close((error) => (error ? reject(error) : resolve()))
+      );
       server = undefined;
     },
   };

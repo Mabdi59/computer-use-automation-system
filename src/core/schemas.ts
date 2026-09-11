@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-export const riskClassificationSchema = z.enum(['safe', 'sensitive', 'irreversible']);
+export const riskClassificationSchema = z.enum([
+  'safe',
+  'sensitive',
+  'irreversible',
+]);
 export const approvalStateSchema = z.enum(['draft', 'approved']);
 export const actionTypeSchema = z.enum([
   'navigate',
@@ -163,11 +167,15 @@ export const artifactStepSchema = z.object({
   action: llmActionSchema,
   risk: riskClassificationSchema.default('safe'),
   timeoutMs: z.number().int().min(100).max(60_000).default(5_000),
-  retryPolicy: z.object({ maxAttempts: z.number().int().min(1).max(3).default(1) }).default({ maxAttempts: 1 }),
-  expectedPageState: z.object({
-    urlIncludes: z.string().optional(),
-    textIncludes: z.string().optional(),
-  }).default({}),
+  retryPolicy: z
+    .object({ maxAttempts: z.number().int().min(1).max(3).default(1) })
+    .default({ maxAttempts: 1 }),
+  expectedPageState: z
+    .object({
+      urlIncludes: z.string().optional(),
+      textIncludes: z.string().optional(),
+    })
+    .default({}),
   checkpoint: z.string().optional(),
 });
 
@@ -254,7 +262,9 @@ export const policySchema = z.object({
   maxSteps: z.number().int().min(1).max(100).default(12),
   maxRunDurationMs: z.number().int().min(1000).max(120_000).default(30_000),
   perStepTimeoutMs: z.number().int().min(100).max(60_000).default(5_000),
-  sensitiveFieldPatterns: z.array(z.string().min(1)).default(['password', 'payment', 'ssn', 'social security']),
+  sensitiveFieldPatterns: z
+    .array(z.string().min(1))
+    .default(['password', 'payment', 'ssn', 'social security']),
   allowSensitiveInput: z.boolean().default(false),
   allowIrreversibleActions: z.boolean().default(false),
   requireHumanApprovalForIrreversible: z.boolean().default(true),

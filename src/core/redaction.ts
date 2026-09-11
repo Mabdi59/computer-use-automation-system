@@ -5,9 +5,13 @@ const secretPatterns = [
   /(cookie\s*[=:]\s*)[^\s,]+/gi,
 ];
 
-const sensitiveFieldPattern = /(password|payment|ssn|social security|cookie|token)/i;
+const sensitiveFieldPattern =
+  /(password|payment|ssn|social security|cookie|token|authorization|auth|secret)/i;
 
-export const redactText = (value: string, extraPatterns: RegExp[] = []): string => {
+export const redactText = (
+  value: string,
+  extraPatterns: RegExp[] = []
+): string => {
   let output = value;
   for (const pattern of [...secretPatterns, ...extraPatterns]) {
     output = output.replace(pattern, '$1[REDACTED]');
