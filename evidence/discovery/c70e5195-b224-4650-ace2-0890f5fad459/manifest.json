@@ -1,0 +1,13 @@
+{
+  "correlationId": "c70e5195-b224-4650-ace2-0890f5fad459",
+  "mode": "scripted-test",
+  "provider": "scripted",
+  "generatedAt": "2026-09-11T05:42:51.557Z",
+  "fileHashes": {
+    "../../../artifacts/member-balance.v1.json": "b4fc353882fe7127716bd099cdac594a1e05436c8b9392c32c15ebc18cc44b06",
+    "events.jsonl": "e36f95c0efc4b5939d6a033be7cf1a3244fb19c5404a1e3d517382400d11bd9c",
+    "generated-member-balance.v1.json": "b4fc353882fe7127716bd099cdac594a1e05436c8b9392c32c15ebc18cc44b06",
+    "result.json": "55759483687f3ef53a7f948ebb40e690e28a424dcd25e326611bc832c1d67804",
+    "run.json": "4680e3582669175dc4436127bb5ed7e4d90d16556c6186a03c7bcdb0140fdf09"
+  }
+}

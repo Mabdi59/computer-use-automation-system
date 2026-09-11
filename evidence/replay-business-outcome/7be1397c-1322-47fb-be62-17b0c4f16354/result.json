@@ -1,0 +1,6 @@
+{
+  "status": "business_outcome",
+  "code": "MEMBER_NOT_FOUND",
+  "message": "Member was not found in synthetic application.",
+  "correlationId": "7be1397c-1322-47fb-be62-17b0c4f16354"
+}

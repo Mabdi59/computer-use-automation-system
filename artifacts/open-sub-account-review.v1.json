@@ -1,0 +1,327 @@
+{
+  "schemaVersion": "1.0.0",
+  "capabilityId": "open-sub-account-review",
+  "name": "Open synthetic sub-account to review",
+  "description": "Navigates a synthetic operator to the review page and blocks final confirmation.",
+  "revision": 1,
+  "vendor": {
+    "name": "Synthetic Credit Union",
+    "application": "Legacy Servicing Portal",
+    "variant": "mock-local"
+  },
+  "compatibleVersions": [
+    "legacy-v1"
+  ],
+  "approvalState": "draft",
+  "riskClassification": "irreversible",
+  "inputParameters": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Synthetic member id",
+      "pattern": "^\\d+$"
+    }
+  ],
+  "outputContract": {
+    "outputs": [
+      {
+        "name": "reviewState",
+        "type": "string",
+        "description": "Review page text"
+      }
+    ],
+    "allowedBusinessOutcomes": []
+  },
+  "preconditions": [
+    "Synthetic target app available locally."
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "Open application shell",
+      "action": {
+        "type": "navigate",
+        "url": "http://127.0.0.1:3000/",
+        "rationale": "artifact step"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    },
+    {
+      "id": "step-2",
+      "description": "Open member search",
+      "action": {
+        "targetId": "member-search-link",
+        "rationale": "artifact step",
+        "type": "click"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 2
+      },
+      "expectedPageState": {
+        "textIncludes": "Member ID"
+      }
+    },
+    {
+      "id": "step-3",
+      "description": "Type member id",
+      "action": {
+        "targetId": "member-id-input",
+        "rationale": "artifact step",
+        "type": "type",
+        "value": "{{memberId}}",
+        "sensitive": false
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    },
+    {
+      "id": "step-4",
+      "description": "Search member",
+      "action": {
+        "targetId": "search-member-button",
+        "rationale": "artifact step",
+        "type": "click"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 2
+      },
+      "expectedPageState": {
+        "textIncludes": "Savings Balance"
+      }
+    },
+    {
+      "id": "step-5",
+      "description": "Open sub-account flow",
+      "action": {
+        "targetId": "open-sub-account-link",
+        "rationale": "artifact step",
+        "type": "click"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {
+        "textIncludes": "Open Sub-Account - Step 1"
+      }
+    },
+    {
+      "id": "step-6",
+      "description": "Continue to review",
+      "action": {
+        "targetId": "continue-button",
+        "rationale": "artifact step",
+        "type": "click"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 2
+      },
+      "expectedPageState": {
+        "textIncludes": "Open Sub-Account - Review"
+      }
+    },
+    {
+      "id": "step-7",
+      "description": "Require approval before confirm",
+      "action": {
+        "targetId": "confirm-submission-button",
+        "rationale": "artifact step",
+        "type": "click"
+      },
+      "risk": "irreversible",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {
+        "textIncludes": "Confirm Submission"
+      }
+    },
+    {
+      "id": "step-8",
+      "description": "Capture review banner",
+      "action": {
+        "targetId": "review-text",
+        "rationale": "artifact step",
+        "type": "extract",
+        "outputKey": "reviewState"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {
+        "textIncludes": "Synthetic only. No real transaction will be executed."
+      }
+    }
+  ],
+  "targets": [
+    {
+      "id": "member-search-link",
+      "name": "Member Search link",
+      "description": "Legacy home navigation link",
+      "stableReason": "Stable navigation text inside the application frame.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "text",
+          "text": "Member Search",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "member-id-input",
+      "name": "Member ID input",
+      "description": "Legacy member id field",
+      "stableReason": "Stable visible label in a server-rendered frame.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "label",
+          "label": "Member ID",
+          "frameName": "legacy-app-frame"
+        },
+        {
+          "kind": "css",
+          "css": "input[name=\"memberId\"]",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "search-member-button",
+      "name": "Search Member button",
+      "description": "Submits member search form",
+      "stableReason": "Stable button text in frame.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "role",
+          "role": "button",
+          "name": "Search Member",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "open-sub-account-link",
+      "name": "Open Sub-Account link",
+      "description": "Starts the flow from member details page",
+      "stableReason": "Stable link text in legacy action region.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "text",
+          "text": "Open Sub-Account",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "continue-button",
+      "name": "Continue button",
+      "description": "Advances to review page",
+      "stableReason": "Stable submit label in wizard.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "role",
+          "role": "button",
+          "name": "Continue",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "confirm-submission-button",
+      "name": "Confirm Submission button",
+      "description": "Irreversible confirmation point",
+      "stableReason": "Stable button text on review page.",
+      "risk": "irreversible",
+      "priority": [
+        {
+          "kind": "role",
+          "role": "button",
+          "name": "Confirm Submission",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "review-text",
+      "name": "Review text",
+      "description": "Review page evidence text",
+      "stableReason": "Stable review banner text.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "text",
+          "text": "Synthetic only. No real transaction will be executed.",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    }
+  ],
+  "checkpoints": [
+    "review-page"
+  ],
+  "successCondition": {
+    "type": "output_present",
+    "outputKey": "reviewState"
+  },
+  "businessOutcomeDetectors": [],
+  "recoverableConditionHandlers": [],
+  "redaction": {
+    "sensitiveFields": [
+      "password",
+      "payment",
+      "ssn"
+    ],
+    "secretPatterns": [
+      "token",
+      "cookie"
+    ]
+  },
+  "defaults": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "targetRoute": "/"
+  },
+  "overrides": [
+    {
+      "tenant": "synthetic-default",
+      "compatibleVersions": [
+        "legacy-v1"
+      ],
+      "targetRoute": "/"
+    }
+  ],
+  "createdAt": "2026-09-11T12:01:24.550Z",
+  "createdBy": {
+    "mode": "scripted-test",
+    "provider": "manual-example",
+    "model": "scripted-test"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "checksum": "07a37e6c3e8bf00903eaf8000b717059e6da68ae4fae200cfaf5f26c697fbe06"
+  }
+}

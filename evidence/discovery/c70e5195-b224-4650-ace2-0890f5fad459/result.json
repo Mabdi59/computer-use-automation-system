@@ -1,0 +1,7 @@
+{
+  "status": "success",
+  "artifactPath": "/home/runner/work/computer-use-automation-system/computer-use-automation-system/artifacts/member-balance.v1.json",
+  "outputs": {
+    "savingsBalance": "$1,234.56"
+  }
+}

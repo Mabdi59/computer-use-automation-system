@@ -1,0 +1,295 @@
+{
+  "schemaVersion": "1.0.0",
+  "capabilityId": "look-up-member-12345-and-return-the-current-savings-balance",
+  "name": "Look up member 12345 and return the current savings balance",
+  "description": "Discovered capability for Look up member 12345 and return the current savings balance",
+  "revision": 1,
+  "vendor": {
+    "name": "Synthetic Credit Union",
+    "application": "Legacy Servicing Portal",
+    "variant": "mock-local"
+  },
+  "compatibleVersions": [
+    "legacy-v1"
+  ],
+  "approvalState": "draft",
+  "riskClassification": "safe",
+  "inputParameters": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Runtime input captured from discovery for memberId",
+      "pattern": "^\\d+$"
+    }
+  ],
+  "outputContract": {
+    "outputs": [
+      {
+        "name": "savingsBalance",
+        "type": "string",
+        "description": "Extracted output savingsBalance"
+      }
+    ],
+    "allowedBusinessOutcomes": [
+      "MEMBER_NOT_FOUND"
+    ]
+  },
+  "preconditions": [
+    "Synthetic target app is running locally on 127.0.0.1."
+  ],
+  "steps": [
+    {
+      "id": "step-1",
+      "description": "navigate step 1",
+      "action": {
+        "type": "navigate",
+        "url": "http://127.0.0.1:3000/",
+        "rationale": "Open the target application shell."
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    },
+    {
+      "id": "step-2",
+      "description": "click step 2",
+      "action": {
+        "targetId": "member-search-link",
+        "rationale": "Open the member search page.",
+        "type": "click"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    },
+    {
+      "id": "step-3",
+      "description": "type step 3",
+      "action": {
+        "targetId": "member-id-input",
+        "rationale": "Enter the synthetic member id.",
+        "type": "type",
+        "value": "{{memberId}}",
+        "sensitive": false
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    },
+    {
+      "id": "step-4",
+      "description": "click step 4",
+      "action": {
+        "targetId": "search-member-button",
+        "rationale": "Search for the synthetic member.",
+        "type": "click"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    },
+    {
+      "id": "step-5",
+      "description": "assert step 5",
+      "action": {
+        "targetId": "savings-balance-label",
+        "rationale": "Verify the member details page loaded.",
+        "type": "assert",
+        "condition": "containsText",
+        "expected": "Savings Balance"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 2
+      },
+      "expectedPageState": {
+        "textIncludes": "Savings Balance"
+      },
+      "checkpoint": "checkpoint-5"
+    },
+    {
+      "id": "step-6",
+      "description": "extract step 6",
+      "action": {
+        "targetId": "savings-balance-value",
+        "rationale": "Capture the savings balance output.",
+        "type": "extract",
+        "outputKey": "savingsBalance"
+      },
+      "risk": "safe",
+      "timeoutMs": 5000,
+      "retryPolicy": {
+        "maxAttempts": 1
+      },
+      "expectedPageState": {}
+    }
+  ],
+  "targets": [
+    {
+      "id": "member-search-link",
+      "name": "Member Search link",
+      "description": "Navigates from the legacy home page to member search",
+      "stableReason": "Stable legacy navigation text inside the shell frame.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "text",
+          "text": "Member Search",
+          "frameName": "legacy-app-frame"
+        },
+        {
+          "kind": "role",
+          "role": "link",
+          "name": "Member Search",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "member-id-input",
+      "name": "Member ID input",
+      "description": "Synthetic member id textbox on legacy search form",
+      "stableReason": "The visible legacy label is stable across variants.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "label",
+          "label": "Member ID",
+          "frameName": "legacy-app-frame"
+        },
+        {
+          "kind": "css",
+          "css": "input[name=\"memberId\"]",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "search-member-button",
+      "name": "Search member button",
+      "description": "Submits the member search form in the legacy frame",
+      "stableReason": "The button text is a stable verb in the product flow.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "role",
+          "role": "button",
+          "name": "Search Member",
+          "frameName": "legacy-app-frame"
+        },
+        {
+          "kind": "text",
+          "text": "Search Member",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "savings-balance-label",
+      "name": "Savings balance label",
+      "description": "Savings balance table row label",
+      "stableReason": "This product label is stable and readable in the member details page.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "text",
+          "text": "Savings Balance",
+          "frameName": "legacy-app-frame"
+        },
+        {
+          "kind": "css",
+          "css": "td.balance-label",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    },
+    {
+      "id": "savings-balance-value",
+      "name": "Savings balance value",
+      "description": "Savings balance value cell",
+      "stableReason": "The row is anchored by a stable visible label with a scoped CSS fallback.",
+      "risk": "safe",
+      "priority": [
+        {
+          "kind": "css",
+          "css": "#savings-balance",
+          "frameName": "legacy-app-frame"
+        },
+        {
+          "kind": "text",
+          "text": "$1,234.56",
+          "frameName": "legacy-app-frame"
+        }
+      ]
+    }
+  ],
+  "checkpoints": [
+    "checkpoint-5"
+  ],
+  "successCondition": {
+    "type": "output_present",
+    "outputKey": "savingsBalance"
+  },
+  "businessOutcomeDetectors": [
+    {
+      "code": "MEMBER_NOT_FOUND",
+      "description": "Member search completed without a synthetic match.",
+      "matchText": "No synthetic member matched"
+    }
+  ],
+  "recoverableConditionHandlers": [
+    {
+      "category": "Transient timeout",
+      "strategy": "retry",
+      "maxAttempts": 2
+    }
+  ],
+  "redaction": {
+    "sensitiveFields": [
+      "password",
+      "payment",
+      "ssn"
+    ],
+    "secretPatterns": [
+      "token",
+      "cookie"
+    ]
+  },
+  "defaults": {
+    "baseUrl": "http://127.0.0.1:3000",
+    "targetRoute": "/"
+  },
+  "overrides": [
+    {
+      "tenant": "synthetic-default",
+      "compatibleVersions": [
+        "legacy-v1"
+      ],
+      "targetRoute": "/"
+    }
+  ],
+  "createdAt": "2026-09-11T12:01:22.736Z",
+  "createdBy": {
+    "mode": "scripted-test",
+    "provider": "scripted",
+    "model": "scripted-test"
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "checksum": "2e25e062af34a79d08ca65997359c1c2f92973948e718c5ebb9bcaab946db6a7"
+  }
+}
