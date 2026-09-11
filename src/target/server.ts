@@ -73,6 +73,10 @@ export const createTargetServer = (port = 3000) => {
 
   app.get('/', (request, response) => {
     const scenario = normalizeScenario(request.query.scenario);
+    response.cookie('syntheticSession', 'synthetic-session-active', {
+      httpOnly: true,
+      sameSite: 'lax',
+    });
     response.send(renderShell('', scenario));
   });
 

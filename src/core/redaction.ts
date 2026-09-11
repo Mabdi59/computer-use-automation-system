@@ -3,10 +3,11 @@ const secretPatterns = [
   /(api[_-]?key\s*[=:]\s*)[^\s,]+/gi,
   /(token\s*[=:]\s*)[^\s,]+/gi,
   /(cookie\s*[=:]\s*)[^\s,]+/gi,
+  /(session(?:id)?\s*[=:]\s*)[^\s,]+/gi,
 ];
 
 const sensitiveFieldPattern =
-  /(password|payment|ssn|social security|cookie|token|authorization|auth|secret)/i;
+  /(password|payment|ssn|social security|cookie|token|authorization|auth|secret|session|credential)/i;
 
 export const redactText = (
   value: string,

@@ -116,10 +116,12 @@ describe('policy and redaction', () => {
 
   it('redacts secrets and sensitive field values', () => {
     expect(redactText('Authorization: bearer abc123')).toContain('[REDACTED]');
+    expect(redactText('session=abc123')).toContain('[REDACTED]');
     expect(redactFieldValue('password', 'hunter2')).toBe('[REDACTED]');
     expect(redactFieldValue('authorization', '******')).toBe('[REDACTED]');
-    expect(sanitizeObject({ token: 'abc123', note: 'safe' })).toEqual({
+    expect(sanitizeObject({ token: 'abc123', sessionId: 'abc123', note: 'safe' })).toEqual({
       token: '[REDACTED]',
+      sessionId: '[REDACTED]',
       note: 'safe',
     });
   });

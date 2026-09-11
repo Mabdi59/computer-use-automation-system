@@ -13,6 +13,7 @@ import {
   buildExampleMemberBalanceArtifact,
   buildOpenSubAccountArtifact,
 } from '../../src/examples.js';
+import { OpenAILLMProvider } from '../../src/providers/llm.js';
 import { runReplay } from '../../src/replay.js';
 import { HandoffManager } from '../../src/runtime/handoff.js';
 import { createTargetServer } from '../../src/target/server.js';
@@ -49,7 +50,7 @@ describe('deterministic replay integration', () => {
   });
 
   it('replays successfully without an LLM provider', async () => {
-    const sentinelProvider = { nextAction: vi.fn() };
+    const nextActionSpy = vi.spyOn(OpenAILLMProvider.prototype, 'nextAction');
     const result = await runReplay({
       artifactPath: memberArtifactPath,
       inputs: { memberId: '12345' },
@@ -62,7 +63,8 @@ describe('deterministic replay integration', () => {
     expect(
       result.status === 'success' ? result.outputs.savingsBalance : ''
     ).toBe('$1,234.56');
-    expect(sentinelProvider.nextAction).not.toHaveBeenCalled();
+    expect(nextActionSpy).not.toHaveBeenCalled();
+    nextActionSpy.mockRestore();
   });
 
   it('returns member-not-found as a business outcome', async () => {
@@ -151,9 +153,27 @@ describe('deterministic replay integration', () => {
     });
   });
 
+  it('returns intervention_required when replay pauses for external human approval', async () => {
+    const manager = new HandoffManager();
+    const result = await runReplay({
+      artifactPath: openArtifactPath,
+      inputs: { memberId: '12345' },
+      targetUrl: defaultTargetUrl,
+      policy: createDefaultPolicy(),
+      evidenceBaseDir: join(tempDir, 'handoff-required'),
+      handoffManager: manager,
+    });
+
+    expect(result.status).toBe('intervention_required');
+    if (result.status === 'intervention_required') {
+      expect(manager.get(result.interventionId).runId).toBe(result.correlationId);
+    }
+  });
+
   it('pauses, keeps the same browser context, records audit events, and resumes', async () => {
     const manager = new HandoffManager();
     let sameContext = false;
+    let preservedCookie = false;
     const result = await runReplay({
       artifactPath: openArtifactPath,
       inputs: { memberId: '12345' },
@@ -163,6 +183,11 @@ describe('deterministic replay integration', () => {
       handoffManager: manager,
       onInterventionRequested: async ({ interventionId, context, page }) => {
         sameContext = context === page.context();
+        preservedCookie = (await context.cookies()).some(
+          (cookie) =>
+            cookie.name === 'syntheticSession' &&
+            cookie.value === 'synthetic-session-active'
+        );
         const frame = page.frame({ name: 'legacy-app-frame' });
         await frame
           ?.getByRole('button', { name: 'Confirm Submission' })
@@ -181,9 +206,16 @@ describe('deterministic replay integration', () => {
     });
 
     expect(sameContext).toBe(true);
+    expect(preservedCookie).toBe(true);
     expect(result.status).toBe('success');
+    if (result.status === 'success') {
+      expect(manager.list()[0]?.runId).toBe(result.correlationId);
+    }
     expect(
       manager.list()[0]?.auditEvents.some((event) => event.type === 'click')
     ).toBe(true);
+    expect(JSON.stringify(manager.list()[0]?.auditEvents ?? [])).not.toContain(
+      'synthetic-session-active'
+    );
   }, 10_000);
 });

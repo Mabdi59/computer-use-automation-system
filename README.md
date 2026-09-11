@@ -90,7 +90,7 @@ npm run demo:headed
 Generate live evidence after exporting `OPENAI_API_KEY`:
 
 ```bash
-npm run evidence:live
+OPENAI_API_KEY=your_key_here npm run evidence:live
 ```
 
 Quality checks:
@@ -112,12 +112,20 @@ npm run format
 5. Inspect `evidence/discovery/`, `evidence/replay-success/`, `evidence/replay-business-outcome/`, and `evidence/handoff/`
 6. Optionally run `npm run demo:headed` and open the tokenized operator URL printed by the CLI
 
+## Human handoff instructions
+
+1. Run `npm run demo:headed`.
+2. Wait for the browser to pause on the synthetic review page.
+3. Open the exact operator-console URL printed in the terminal.
+4. Claim the intervention, inspect the same live Playwright session, then resume or abort.
+5. Review `evidence/handoff/` for the shared correlation ID, intervention record, and sanitized audit trail.
+
 ## Live mode vs scripted test mode
 
 - **Live mode** uses `OpenAILLMProvider` and requires `OPENAI_API_KEY`.
 - **Scripted test mode** uses `ScriptedLLMProvider` for offline tests and demonstrations.
 - The committed evidence is intentionally marked `mode: scripted-test`; it is not presented as genuine live-model evidence.
-- `evidence/README.md` contains the exact command sequence the final submitter should run to generate live discovery evidence.
+- `evidence/README.md` contains the exact single command the final submitter should run after setup to generate live discovery evidence.
 
 ## Artifact example
 
@@ -169,7 +177,7 @@ This project automates a synthetic local application only. The policy blocks off
 ```text
 artifacts/        Versioned capability artifacts
 coverage/         Test coverage output when generated
- evidence/         Scripted demo evidence and live-evidence instructions
+evidence/         Scripted demo evidence and live-evidence instructions
 src/
   core/           Schemas, checksum, policy, redaction, defaults
   providers/      OpenAI and scripted LLM providers

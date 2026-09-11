@@ -15,6 +15,8 @@ import { createTargetServer } from './target/server.js';
 
 const repoRoot = process.cwd();
 const defaultTargetUrl = 'http://127.0.0.1:3000';
+const liveEvidenceCommand =
+  'OPENAI_API_KEY=your_key_here npm run evidence:live';
 
 const parseArgs = (argv: string[]): Record<string, string | boolean> => {
   const result: Record<string, string | boolean> = {};
@@ -52,7 +54,7 @@ const ensureLiveEvidenceInstructions = async (): Promise<void> => {
   await mkdir(resolve(repoRoot, 'evidence'), { recursive: true });
   await writeFile(
     resolve(repoRoot, 'evidence/README.md'),
-    `# Evidence\n\nThis repository includes offline scripted evidence marked \`mode: scripted-test\`.\n\nTo generate genuine live discovery evidence after setting OPENAI_API_KEY, run:\n\n\`\`\`bash\nnpm install\nnpx playwright install chromium\nnpm run dev:target\nnpm run evidence:live\n\`\`\`\n\nThe live command runs discovery against http://127.0.0.1:3000 and writes fresh evidence into /evidence/discovery/. Do not submit fabricated live evidence.\n`
+    `# Evidence\n\nThis repository includes offline scripted evidence marked \`mode: scripted-test\`.\n\nAfter the reviewer has already run repository setup, the exact live evidence command is:\n\n\`\`\`bash\n${liveEvidenceCommand}\n\`\`\`\n\nThe command starts the synthetic target locally, runs OpenAI-backed discovery against http://127.0.0.1:3000, and writes sanitized evidence into /evidence/discovery/. Do not submit fabricated live evidence.\n`
   );
 };
 
@@ -208,7 +210,7 @@ const main = async (): Promise<void> => {
     case 'evidence:live': {
       if (!process.env.OPENAI_API_KEY) {
         console.error(
-          'OPENAI_API_KEY is not set. After exporting it, run: npm run discover -- --goal "Look up member 12345 and return the current savings balance" --target http://127.0.0.1:3000 --artifact artifacts/member-balance.live.v1.json --input memberId=12345'
+        `OPENAI_API_KEY is not set. After configuring it, run: ${liveEvidenceCommand}`
         );
         process.exitCode = 1;
         return;

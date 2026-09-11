@@ -329,7 +329,9 @@ export class PlaywrightSurfaceAdapter implements SurfaceAdapter {
           target.textContent ||
           target.tagName;
         const sensitive =
-          /password|payment|ssn|social security|token|cookie/i.test(name);
+          /password|payment|ssn|social security|token|cookie|session|credential/i.test(
+            name
+          );
         return {
           label: name.trim().slice(0, 120),
           value: sensitive
@@ -393,7 +395,9 @@ export class PlaywrightSurfaceAdapter implements SurfaceAdapter {
               target.textContent ||
               target.tagName;
             const sensitive =
-              /password|payment|ssn|social security|token|cookie/i.test(name);
+              /password|payment|ssn|social security|token|cookie|session|credential/i.test(
+                name
+              );
             return {
               label: name.trim().slice(0, 120),
               value: sensitive

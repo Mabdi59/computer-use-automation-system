@@ -2,13 +2,10 @@
 
 This repository includes offline scripted evidence marked `mode: scripted-test`.
 
-To generate genuine live discovery evidence after setting OPENAI_API_KEY, run:
+After the reviewer has already run repository setup, the exact live evidence command is:
 
 ```bash
-npm install
-npx playwright install chromium
-npm run dev:target
-npm run evidence:live
+OPENAI_API_KEY=your_key_here npm run evidence:live
 ```
 
-The live command runs discovery against http://127.0.0.1:3000 and writes fresh evidence into /evidence/discovery/. Do not submit fabricated live evidence.
+The command starts the synthetic target locally, runs OpenAI-backed discovery against http://127.0.0.1:3000, and writes sanitized evidence into /evidence/discovery/. Do not submit fabricated live evidence.
