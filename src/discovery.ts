@@ -1,6 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
+import type { BrowserContext, Page } from 'playwright';
+
 import {
   artifactPayloadForChecksum,
   computeArtifactChecksum,
@@ -229,6 +231,8 @@ export const runDiscovery = async (params: {
   handoffManager?: HandoffManager;
   onInterventionRequested?: (context: {
     intervention: InterventionRequest;
+    browserContext: BrowserContext;
+    page: Page;
   }) => Promise<void>;
 }): Promise<ReturnType<typeof discoveryRunResultSchema.parse>> => {
   const evidence = new EvidenceWriter(params.evidenceBaseDir);
@@ -353,7 +357,11 @@ export const runDiscovery = async (params: {
             return discoveryRunResultSchema.parse(result);
           }
           params.handoffManager.claim(intervention.interventionId);
-          await params.onInterventionRequested?.({ intervention });
+          await params.onInterventionRequested?.({
+            intervention,
+            browserContext: adapter.getContext(),
+            page: adapter.getPage(),
+          });
           const decision = await params.handoffManager.waitForResolution(
             intervention.interventionId
           );
@@ -457,7 +465,11 @@ export const runDiscovery = async (params: {
           return discoveryRunResultSchema.parse(result);
         }
         params.handoffManager.claim(intervention.interventionId);
-        await params.onInterventionRequested?.({ intervention });
+        await params.onInterventionRequested?.({
+          intervention,
+          browserContext: adapter.getContext(),
+          page: adapter.getPage(),
+        });
         const decision = await params.handoffManager.waitForResolution(
           intervention.interventionId
         );

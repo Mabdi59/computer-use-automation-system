@@ -166,7 +166,9 @@ describe('deterministic replay integration', () => {
 
     expect(result.status).toBe('intervention_required');
     if (result.status === 'intervention_required') {
-      expect(manager.get(result.interventionId).runId).toBe(result.correlationId);
+      expect(manager.get(result.interventionId).runId).toBe(
+        result.correlationId
+      );
     }
   });
 

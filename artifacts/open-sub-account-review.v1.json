@@ -9,7 +9,9 @@
     "application": "Legacy Servicing Portal",
     "variant": "mock-local"
   },
-  "compatibleVersions": ["legacy-v1"],
+  "compatibleVersions": [
+    "legacy-v1"
+  ],
   "approvalState": "draft",
   "riskClassification": "irreversible",
   "inputParameters": [
@@ -31,7 +33,9 @@
     ],
     "allowedBusinessOutcomes": []
   },
-  "preconditions": ["Synthetic target app available locally."],
+  "preconditions": [
+    "Synthetic target app available locally."
+  ],
   "steps": [
     {
       "id": "step-1",
@@ -277,7 +281,9 @@
       ]
     }
   ],
-  "checkpoints": ["review-page"],
+  "checkpoints": [
+    "review-page"
+  ],
   "successCondition": {
     "type": "output_present",
     "outputKey": "reviewState"
@@ -285,8 +291,15 @@
   "businessOutcomeDetectors": [],
   "recoverableConditionHandlers": [],
   "redaction": {
-    "sensitiveFields": ["password", "payment", "ssn"],
-    "secretPatterns": ["token", "cookie"]
+    "sensitiveFields": [
+      "password",
+      "payment",
+      "ssn"
+    ],
+    "secretPatterns": [
+      "token",
+      "cookie"
+    ]
   },
   "defaults": {
     "baseUrl": "http://127.0.0.1:3000",
@@ -295,11 +308,13 @@
   "overrides": [
     {
       "tenant": "synthetic-default",
-      "compatibleVersions": ["legacy-v1"],
+      "compatibleVersions": [
+        "legacy-v1"
+      ],
       "targetRoute": "/"
     }
   ],
-  "createdAt": "2026-09-11T05:43:09.385Z",
+  "createdAt": "2026-09-11T12:01:24.550Z",
   "createdBy": {
     "mode": "scripted-test",
     "provider": "manual-example",
@@ -307,6 +322,6 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "checksum": "2f6d3394dfba1c1ddb9dd3c1ce17265bb7e30d572d3b9fbe5823df8ce5e4a323"
+    "checksum": "07a37e6c3e8bf00903eaf8000b717059e6da68ae4fae200cfaf5f26c697fbe06"
   }
 }

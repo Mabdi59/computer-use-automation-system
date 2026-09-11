@@ -9,8 +9,11 @@ describe('OpenAI provider integration contract', () => {
       output_text:
         'Operational note:\n{"type":"wait","ms":250,"rationale":"wait for the next synthetic page state"}',
     });
-    (provider as unknown as { client: { responses: { create: typeof create } } }).client =
-      { responses: { create } };
+    (
+      provider as unknown as {
+        client: { responses: { create: typeof create } };
+      }
+    ).client = { responses: { create } };
 
     const action = await provider.nextAction({
       goal: 'Look up member 12345 and return the current savings balance',
@@ -29,7 +32,8 @@ describe('OpenAI provider integration contract', () => {
       type: 'wait',
       ms: 250,
     });
-    const requestText = create.mock.calls[0]?.[0]?.input?.[1]?.content?.[0]?.text;
+    const requestText =
+      create.mock.calls[0]?.[0]?.input?.[1]?.content?.[0]?.text;
     expect(requestText).toContain('[REDACTED]');
     expect(requestText).not.toContain('abc123');
   });

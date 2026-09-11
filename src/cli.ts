@@ -210,7 +210,7 @@ const main = async (): Promise<void> => {
     case 'evidence:live': {
       if (!process.env.OPENAI_API_KEY) {
         console.error(
-        `OPENAI_API_KEY is not set. After configuring it, run: ${liveEvidenceCommand}`
+          `OPENAI_API_KEY is not set. After configuring it, run: ${liveEvidenceCommand}`
         );
         process.exitCode = 1;
         return;

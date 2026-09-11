@@ -1,9 +1,9 @@
 const secretPatterns = [
   /(bearer\s+)[a-z0-9._-]+/gi,
-  /(api[_-]?key\s*[=:]\s*)[^\s,]+/gi,
-  /(token\s*[=:]\s*)[^\s,]+/gi,
-  /(cookie\s*[=:]\s*)[^\s,]+/gi,
-  /(session(?:id)?\s*[=:]\s*)[^\s,]+/gi,
+  /(api[_-]?key\s*[:=]?\s*)[^\s,]+/gi,
+  /(token\s*[:=]?\s*)[^\s,]+/gi,
+  /(cookie\s*[:=]?\s*)[^\s,]+/gi,
+  /(session(?:id)?\s*[:=]?\s*)[^\s,]+/gi,
 ];
 
 const sensitiveFieldPattern =

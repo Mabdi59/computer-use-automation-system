@@ -1,0 +1,5 @@
+{
+  "correlationId": "716c86f1-55c8-4606-8334-688cd97ce21c",
+  "goal": "Look up member 12345 and return the current savings balance",
+  "mode": "scripted-test"
+}

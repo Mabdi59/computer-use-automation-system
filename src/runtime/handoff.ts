@@ -35,9 +35,11 @@ export class HandoffManager {
     const router = express.Router();
     const operatorToken = this.operatorAccessToken;
     const authorize: express.RequestHandler = (request, response, next) => {
+      const queryToken = request.query.operatorToken;
       const providedToken =
-        String(request.query.operatorToken ?? '') ||
-        String(request.get('x-operator-token') ?? '');
+        typeof queryToken === 'string' && queryToken.length > 0
+          ? queryToken
+          : String(request.get('x-operator-token') ?? '');
       if (providedToken !== operatorToken) {
         response.status(403).send('Operator token required.');
         return;

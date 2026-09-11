@@ -1,0 +1,11 @@
+{
+  "correlationId": "532a4546-4907-4383-911c-da79931bc97f",
+  "mode": "replay",
+  "provider": "none",
+  "generatedAt": "2026-09-11T12:01:23.703Z",
+  "fileHashes": {
+    "events.jsonl": "c3d01b6ad0483a4c8cf99764f863f5d9e1da341ced9e188c6b63a0c48d5ee06a",
+    "result.json": "4de2984d6850d5f7c08bfe1e5a13a44c78267441377992ca7ad8ae5d8ab4a304",
+    "run.json": "42acff22abb3e9c5d1679517d9538f706ab27463175ecfa098ec3eabc9e2efd6"
+  }
+}
